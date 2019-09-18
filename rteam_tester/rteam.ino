@@ -1,5 +1,6 @@
 // Library for controlling the hobby servo
 #include <Servo.h>
+#include <limits.h>
 
 // Motor driver pin connections
 #define ENB 5  // left motor enable
@@ -19,9 +20,9 @@
 // Macros to read the three line tracking sensors.
 // These will return '0' with a light surface and '1'
 // with a dark surface.
-#define LT_R !digitalRead(10)
-#define LT_M !digitalRead(4)
-#define LT_L !digitalRead(2)
+#define LT_R (digitalRead(10)==LOW ? 1 : 0)
+#define LT_M (digitalRead(4)==LOW ? 1 : 0)
+#define LT_L (digitalRead(2)==LOW ? 1 : 0)
 
 // servo object for head
 Servo head;
@@ -46,7 +47,7 @@ void init_robot() {
 // LSB is the right sensor and the middle bit is the middle sensor
 // a set bit (1) = dark surface
 int get_lightsensor() {
-    return (LT_R == HIGH) | (LT_M == HIGH) << 1 | (LT_L == HIGH) << 2;
+    return LT_R | LT_M << 1 | LT_L << 2;
 }
 
 // prints the status of light sensor to USB Serial
@@ -171,7 +172,12 @@ int get_distance() {
   digitalWrite(Trig, HIGH); // start ping
   delayMicroseconds(10); 
   digitalWrite(Trig, LOW);  // end ping
-  return (int)pulseIn(Echo, HIGH, 10000) / 58; // measure time of flight and convert to cm
+  int distance = (int)pulseIn(Echo, HIGH, 10000) / 58;
+  // dumb edge case--when there's nothing it registers as 0
+  if (distance == 0) {
+    distance = INT_MAX;
+  }
+  return distance; // measure time of flight and convert to cm
 }
 
 void _test_head_servo() {
