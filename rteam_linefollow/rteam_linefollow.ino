@@ -1,9 +1,10 @@
-#define START_DELAY 250
+#define SERVO_DELAY 250
 #define START_BURST 50
 
 
 enum RobotState {
   Start = 0,
+  StartBurst,
   Straight,
   VeeredLeft,
   VeeredRight,
@@ -14,7 +15,10 @@ enum RobotState {
 
 void set_state(enum RobotState);
 
+// current robot state
 enum RobotState state;
+// last state before obstacle was detected
+enum RobotState state_before_obstacle;
 // millisecond timestamp of the last time state changed
 long last_time;
 // millisecond timestamp of the last pitstop time
@@ -24,6 +28,7 @@ int lt;
 
 void setup() {
   state = Start;
+  state_before_obstacle = Start;
   init_robot();
   last_time = millis();
 }
@@ -36,14 +41,17 @@ void loop() {
   
   if (state == Start) {
     set_head(90);
-    if (delta_time() < START_DELAY) {
-      set_left_motor(-5);
-      set_right_motor(-5);
+    set_left_motor(0);
+    set_right_motor(0);
+
+    if (delta_time() > SERVO_DELAY) {
+      set_state(StartBurst);
     }
-    else {
-      set_left_motor(100);
-      set_right_motor(100);
-    }
+  }
+  if (state == StartBurst) {
+    set_left_motor(100);
+    set_right_motor(100);
+
     if (delta_time() > START_BURST) {
       set_state(Straight);
     }
@@ -129,9 +137,10 @@ void loop() {
         delay(1);
       }
       set_head(90);
+      delay(SERVO_DELAY);
       last_pitstop_time = millis();
     }
-    set_state(Start);
+    set_state(StartBurst);
   }
   else if (state == Unexpected) {
     set_left_motor(0);
@@ -146,23 +155,27 @@ void loop() {
   else if (state == ObstacleDetected) {
     set_left_motor(-1);
     set_right_motor(-1);
-    if (lt = 0b111) {
+    if (lt == 0b111) {
       set_state(AllBlack);
     }
     else if (get_distance() > 31) {
-      set_state(Straight);
+      set_state(state_before_obstacle);
+    }
+    else {
+      set_state(ObstacleDetected);
     }
   }
 
-  if (get_distance() < 31) {
+  // all states can transition to ObstacleDetected using this
+  if (get_distance() < 31 && state != ObstacleDetected) {
+    state_before_obstacle = state;
     set_state(ObstacleDetected);
   }
   
   delay(10);
 }
 
-//void set_state(enum RobotState st) {
-void set_state(int st) {
+void set_state(enum RobotState st) {
   if (state != st && st != Unexpected) {
     state = st;
     last_time = millis();
